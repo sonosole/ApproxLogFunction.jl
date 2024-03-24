@@ -1,0 +1,13 @@
+name = "ApproxLogFunction"
+uuid = "e8ddb7d6-0a34-4df1-87ae-36dec4b447d4"
+authors = ["Sole sonosole@163.com"]
+version = "0.1.0"
+
+
+[deps]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+
+[compat]
+julia = "≥ 1.0"
+

@@ -48,7 +48,7 @@ end
 plot(figs..., layout=(1,2), leg=nothing, size=(999,666))
 ```
 
-![error](./doc/err.jpg)
+![error](./doc/abserr.jpg)
 
 ## 🥇 Benchmark
 

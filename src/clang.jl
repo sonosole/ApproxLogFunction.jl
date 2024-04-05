@@ -34,7 +34,7 @@ function csrc(funcname::String, f::Approxlog{I,F}) where {I,F}
         $itype z = *( ($itype*) (&x) );
         $itype e = (z >> $fracbits) - $expobias;
         $itype i = (z & $fracmask) >> $shiftbits;
-        return e * $logbase2 + table[i];
+        return $logbase2 * e + table[i];
     }
     """
     return code

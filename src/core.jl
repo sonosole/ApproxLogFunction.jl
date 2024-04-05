@@ -5,7 +5,7 @@
 end
 
 
-mutable struct Approxlog{XInt, XFloat}
+struct Approxlog{XInt, XFloat}
     expobits  :: XInt
     fracbits  :: XInt
     expobias  :: XInt
@@ -26,7 +26,7 @@ mutable struct Approxlog{XInt, XFloat}
                                     logtable  :: Vector{XFloat}) where {XInt <: Integer, XFloat <: AbstractFloat}
 
         new{XInt,XFloat}(expobits, fracbits, expobias, fracmask,
-                 shiftbits, logbase, logbase2, maxerror, logtable)
+                         shiftbits, logbase, logbase2, maxerror, logtable)
     end
 end
 
@@ -60,23 +60,44 @@ function maxerror(f::Approxlog)
 end
 
 
-function Approxlog(base::Real; dtype::Type{F}, abserror::Real) where F <: AbstractFloat
-    @assert base > 1 "base > 1 shall be met, but got $base"
-    I  = f2i(F)
-    l  = one(I)
-    dx = abserror * log(base)
+"""
+    Approxlog(base::Real; dtype::Type{<:AbstractFloat}, abserror::Real)
+A lookup table based method to calculate `y` = log(base, `x`) with controllable error
 
-    npower = nextpow(2, 1 / dx)
-    usedfracbits = floor(I, log2(npower))
-    
-    tsize = l << usedfracbits
-    table = Vector{F}(undef, tsize)
-    delta = 1 / tsize
-    for i = 1 : tsize
-        table[i] = log(base, 1 + (i-1) * delta)
++ `base` is the radix of logarithm operation
++ `dtype` is the data type of input `x` and output `y`
++ `abserror` is the required absolute error of the output `y`
+
+# Example
+```julia
+alog₂  = Approxlog(2, abserror=0.1, dtype=Float32);
+input  = 5.20f2;
+output = alog₂(input);
+```
+"""
+function Approxlog(base::Real; dtype::Type{F}, abserror::Real) where F <: AbstractFloat
+    @assert base > 0 "base > 0 shall be met, but got $base"
+    @assert base ≠ 1 "base ≠ 1 shall be met, but got $base"
+
+    if abs(1-base) < 1e-2
+        @warn("the base of log is too much closing to 1")
     end
 
-    maxerror = delta / log(base)
+    I = f2i(F)  # the right integer type corresponding to float type F
+    l = one(I)  # alias for integer 1
+
+    inputerror   = abserror * abs(log(base))
+    usedfracbits = floor(I, log2(nextpow(2, 1 / inputerror)))
+    tablelength  = l << usedfracbits
+    
+    if usedfracbits > 14
+        kbs = 2^usedfracbits * sizeof(F) / 1024
+        @warn("the table buffer would occupy $kbs KiB")
+    end
+
+    Δx = F(1  / tablelength)     # the actual input error
+    Δy = F(Δx / abs(log(base)))  # the actual output error
+
     expobits = nothing
     fracbits = nothing
     if F <: Float16
@@ -91,19 +112,23 @@ function Approxlog(base::Real; dtype::Type{F}, abserror::Real) where F <: Abstra
         expobits = I(11)
         fracbits = I(52)
     end
-
-    expobias  = ( (l << (expobits-1)) - l )
-    fracmask  = ( (l << (fracbits  )) - l )
+    expobias = ( (l << (expobits-1)) - l )  # exponent part's bias number for float type F
+    fracmask = ( (l << (fracbits  )) - l )  # to set non-fracbits 0
+    
     shiftbits = fracbits - usedfracbits
+    @assert fracbits > usedfracbits "using too much bits for fraction, we only have $fracbits for $F, but you want $usedfracbits"
+
+    table = Vector{F}(undef, tablelength)
+    for i = 1 : tablelength
+        table[i] = log(base, 1 + (i-1) * Δx)
+    end
+
     return Approxlog{I,F}(expobits,
                           fracbits,
                           expobias,
                           fracmask,
                           shiftbits,
-                          base,
-                          F(log(base,2)),
-                          F(maxerror),
-                          table)
+                          base, F(log(base,2)), Δy, table)
 end
 
 

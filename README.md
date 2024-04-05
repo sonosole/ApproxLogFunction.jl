@@ -1,6 +1,6 @@
 # ApproxLogFunction
 
-A lookup table based method to calculate $y = {\rm log}_b(x)$ with a controllable error, where $b > 1$, $x > 0$, and $x$ shall be the **IEEE754** floating-point **normal** numbers.
+A lookup table based method to calculate $y = {\rm log}_b(x)$ with a controllable error, where $b > 0$, $b ≠ 1$, $x > 0$, and $x$ shall be the **IEEE754** floating-point **normal** numbers.
 
 ## 💽 Installation
 
@@ -19,7 +19,7 @@ The exposed constructor :
 Approxlog(base::Real; abserror::Real, dtype::Type{<:AbstractFloat})
 ```
 
-where  `base`  is the radix of logarithm operation,  `abserror`  is the maximum absolute error of the `output` and  `dtype`  is the data type of input and output value, for example :
+where  `base`  is the radix of logarithm operation,  `abserror`  is the maximum absolute error of the output and  `dtype`  is the data type of input and output value, for example :
 
 ```julia
 alog₂  = Approxlog(2, abserror=0.1, dtype=Float32);
@@ -99,7 +99,7 @@ julia> @benchmark y₂ = alog.($x)
 Calculating scaler input is slower, but why calculating array input is faster ? 😂😂😂
 
 ## ⚠️ Attention
-
+### About The Input Range
 Error is well controlled when using IEEE754 floating-point positive **normal** numbers, which is represented as :
 
 $$
@@ -137,6 +137,9 @@ X_{\rm Float64} \le 2^{1023} \ \left(1 + (2^{52} -1) × 2^{-52}\right)
 $$
 
 As to positive **subnormal** numbers, the result is not reliable.
+
+### About The Base Range
+We have mentioned $b ≠ 1$, but base value closing to $1$ is not recommended, e.g. $1.0001$, $0.9999$. 
 
 ## 📁 C-Lang Files
 

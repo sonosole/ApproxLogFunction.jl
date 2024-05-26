@@ -1,7 +1,7 @@
 name = "ApproxLogFunction"
 uuid = "e8ddb7d6-0a34-4df1-87ae-36dec4b447d4"
 authors = ["Sole sonosole@163.com"]
-version = "0.1.1"
+version = "0.1.2"
 
 
 [deps]

@@ -1,31 +1,36 @@
-function csrc(funcname::String, f::Approxlog{I,F}) where {I,F}
+function hcsrc(filename::String, funcname::String, f::Approxlog{I,F}) where {I,F}
     four  = "    "
     fmax  = floatmax(F)
     ftype = nothing
     itype = nothing
     logᵦ = f.logtable
     N    = length(logᵦ)
-    code = "#include <stdint.h>\n\n"
+
+    dotc = """
+    #include <stdint.h>
+    #include "$(filename).h"\n
+    """
+
     if I <: Int32
         ftype = "float"
         itype = "int32_t"
-        code *= "static float table[$N] = \n{\n"
+        dotc *= "static float table[$N] = \n{\n"
     end
     if I <: Int64
         ftype = "double"
         itype = "int64_t"
-        code *= "static double table[$N] = \n{\n"
+        dotc *= "static double table[$N] = \n{\n"
     end
     for i = 1 : N - 1
-        code *= "$four$(logᵦ[i]),\n"
-    end;code *= "$four$(logᵦ[N])\n};\n\n"
+        dotc *= "$four$(logᵦ[i]),\n"
+    end;dotc *= "$four$(logᵦ[N])\n};\n\n"
 
     fracbits  = f.fracbits
     expobias  = f.expobias
     fracmask  = f.fracmask
     shiftbits = f.shiftbits
     logbase2  = f.logbase2
-    code *= """
+    dotc *= """
     $ftype $funcname($ftype x)
     {
         if(x <= 0){
@@ -37,34 +42,34 @@ function csrc(funcname::String, f::Approxlog{I,F}) where {I,F}
         return $logbase2 * e + table[i];
     }
     """
-    return code
-end
-
-
-function hsrc(filename::String, funcname::String, f::Approxlog{I,F}) where {I,F}
-    ftype = nothing
-    if I <: Int32
-        ftype = "float"
-    end
-    if I <: Int64
-        ftype = "double"
-    end
 
     FILENAME = uppercase(filename)
-    head = """
+    doth = """
     #ifndef $(FILENAME)_H
     #define $(FILENAME)_H
-
-    #include "$(filename).h"
 
     $ftype $funcname($ftype x);
 
     #endif
     """
-    return head
+    return doth, dotc
 end
 
 
+"""
+    toclang(dstdir::String, filename::String, funcname::String, f::Approxlog)
+generate C language `.h` and `.c` files for an `Approxlog` functor `f`.
+
++ `dstdir` is the directory to save the C language files (`dir` would be made if it doesn't exist before)
++ `filename` is the name of the generated `.c` and `.h` files
++ `funcname` is the name of the generated approximate function
+
+# Example
+```julia
+alog₂ = Approxlog(2, abserror=0.12, dtype=Float32);
+toclang("./cfolder/",  "approxlog", "alog", alog₂);
+```
+"""
 function toclang(dstdir::String, filename::String, funcname::String, f::Approxlog{I,F}) where {I,F}
     if !isdir(dstdir)
         mkdir(dstdir)
@@ -73,16 +78,17 @@ function toclang(dstdir::String, filename::String, funcname::String, f::Approxlo
     nowdir = pwd()
     cd(dstdir)
 
-    str = hsrc(filename, funcname, f)
-    dst = touch(filename * ".h")
-    open(dst, "w") do io
-        write(io, str)
+    doth, dotc = hcsrc(filename, funcname, f)
+
+    hdst = touch(filename * ".h")
+    cdst = touch(filename * ".c")
+
+    open(hdst, "w") do io
+        write(io, doth)
     end
 
-    str = csrc(funcname, f)
-    dst = touch(filename * ".c")
-    open(dst, "w") do io
-        write(io, str)
+    open(cdst, "w") do io
+        write(io, dotc)
     end
 
     cd(nowdir)
